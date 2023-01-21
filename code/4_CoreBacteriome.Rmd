@@ -188,8 +188,8 @@ wd %>%
     More = paste(round(mean(Abundance)*100,2), ' (', round(sd(Abundance)*100,2), ')', sep='')
   )
 ) %>%
-  arrange(Sampling) %>%
-  select(-Sampling) %>%
+  dplyr::arrange(Sampling) %>%
+  dplyr::select(-Sampling) %>%
 #xtable() %>%
   kable(caption="Relative abundances by environmental and seasonal categories.<br>https://doi.org/10.1371/journal.pone.0273844.t001") %>%
 #datatable(caption="Hello") %>%

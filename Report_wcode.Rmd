@@ -3,7 +3,7 @@ title: "Natural diversity of the honey bee (Apis mellifera) gut bacteriome in va
 # runtime: shiny
 output:
   html_document:
-    code_folding: show
+    code_folding: hide
     theme:
       bootswatch: superhero
     fig_caption: yes
@@ -148,7 +148,7 @@ Based on our results, one may conclude that the composition of healthy core bact
 # Handling of raw data
 *Data Availability:* The short read data of samples are publicly available and accessible through the PRJNA685398 from the NCBI Sequence Read Archive (SRA).
 
-Here is the code for the pipeline.
+Here is the code for the digesting the raw sequencing data:
 ```{r child = 'code/7_Data_Pipeline.Rmd'}
 ```
 
