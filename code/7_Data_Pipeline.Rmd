@@ -1,0 +1,188 @@
+```{r, eval=FALSE}
+library(ShortRead)
+
+fs = list.files(path='../sampling01', pattern='fastq.gz', full.names=T)
+m = matrix(unlist(strsplit(gsub('../sampling01/mehbel', '', fs), '_')), nr=40, byrow=T)
+ts = paste('s1_', formatC(as.numeric(m[,1]),  width=2, flag = "0"), gsub('R', '_', m[,4]), '.fastq', sep='')
+
+for(i in 1:length(fs)){
+  a = readFastq(fs[i])  
+  writeFastq(a, ts[i], compress=F, full=T)
+  print(i)
+}
+
+fs = list.files(path='../sampling02', pattern='fastq.gz', full.names=T)
+m = matrix(unlist(strsplit(gsub('../sampling02/', '', fs), '_')), nr=40, byrow=T)
+ts = paste('s2_', formatC(as.numeric(m[,1]),  width=2, flag = "0"), gsub('R', '_', m[,4]), '.fastq', sep='')
+
+for(i in 1:length(fs)){
+  a = readFastq(fs[i])  
+  writeFastq(a, ts[i], compress=F, full=T)
+  print(i)
+}
+```
+
+```{bash, eval=FALSE}
+export PATH=$PATH:/data/tools/pear-0.9.11-linux-x86_64/bin
+
+for f in *_1.fastq
+do 
+  r=${f/'_1.fastq'/'_2.fastq'}
+  m=${f/'_1.fastq'/''}
+  pear --threads 38 -f $f -r $r -o $m
+done
+```
+
+```{bash, eval=FALSE}
+export PATH=$PATH:/data/tools/FastQC
+export PATH=$PATH:/data/tools/adapterremoval/build
+
+for f in *assembled.fastq
+do 
+  fastqc -t 38 $f
+  b=${f/'_assembled.fastq'/'_peard'}  
+  o=${f/'assembled'/'assembled_clean'}  
+  AdapterRemoval --threads 38 \
+    --file1 $f \
+    --basename $b \
+    --output1 $o \
+    --trimns \
+    --trimqualities --minquality 15   
+done 
+```
+
+```{bash, eval=FALSE}
+export PATH=$PATH:/data/tools/bowtie2-2.3.5-linux-x86_64
+     
+for f in *_clean.fastq
+do
+  bam=${f/'.fastq'/'.bam'}
+  o=${bam/'.bam'/'_no_bee.fq'}
+  bowtie2 -p 38 --very-sensitive -x ../../pogany2018/bee $f | samtools view -Sb -f 4 > $bam
+  samtools bam2fq $bam > $o
+done
+
+for f in *no_bee.fq
+do
+  bam=${f/'no_bee.fq'/'no_bee_no_phix.bam'}
+  o=${bam/'no_bee_no_phix.bam'/'no_bee_no_phix.fq'}
+  bowtie2 -p 38 --very-sensitive -x /data/dbs/idxs/PhiX/Illumina/RTA/Sequence/Bowtie2Index/genome $f | samtools view -Sb -f 4 > $bam
+  samtools bam2fq $bam > $o
+done
+
+for f in *_clean.fastq
+do
+  bam=${f/'.fastq'/'.bam'}
+  o=${bam/'.bam'/'_no_phix.fq'}
+  bowtie2 -p 38 --very-sensitive -x /data/dbs/idxs/PhiX/Illumina/RTA/Sequence/Bowtie2Index/genome $f | samtools view -Sb -f 4 > $bam
+  samtools bam2fq $bam > $o
+done
+
+export PATH=$PATH:/data/tools/vsearch/bin
+
+for f in *no_bee_no_phix.fq
+do
+  de=${f/'.fq'/'.derep.fa'}
+  vsearch --threads 38 \
+    --derep_fulllength $f \
+    --strand plus \
+    --output $de \
+    --sizeout \
+    --uc $de.uc \
+    --fasta_width 0
+done
+
+for f in *clean_no_phix.fq
+do
+  de=${f/'.fq'/'.derep.fa'}
+  vsearch --threads 38 \
+    --derep_fulllength $f \
+    --strand plus \
+    --output $de \
+    --sizeout \
+    --uc $de.uc \
+    --fasta_width 0
+done
+
+#!/bin/bash
+
+export PATH=$PATH:/data/tools/kraken2
+    
+db='/data/dbs/kraken2/nt20190810'
+
+for f in *derep.fa
+do
+  rpt=${f/'.derep.fa'/'.rpt'}
+  out=${f/'.derep.fa'/'.kraken'}
+  kraken2 --threads 38 \
+    --db $db \
+    --report $rpt $f > $out
+done
+
+db='/data/dbs/kraken2/refseq'
+
+for f in *derep.fa
+do
+  rpt=${f/'.derep.fa'/'.rpt2'}
+  out=${f/'.derep.fa'/'.kraken2'}
+  kraken2 --threads 38 \
+    --db $db \
+    --report $rpt $f > $out
+done
+
+kraken-biom --fmt json -o no_bee_no_phix_nt.biom *no_bee_no_phix.rpt
+kraken-biom --fmt json -o no_bee_no_phix_refseq.biom *no_bee_no_phix.rpt2
+kraken-biom --fmt json -o no_phix_nt.biom *_clean_no_phix.rpt
+kraken-biom --fmt json -o no_phix_refseq.biom *_clean_no_phix.rpt2
+
+export PATH=$PATH:/data/tools/kraken2
+    
+db='/data/dbs/kraken2/nt20190810'
+
+for f in  *_no_bee_no_phix.derep.fa
+do
+  rpt=${f/'.derep.fa'/'_conf05.rpt2'}
+  out=${f/'.derep.fa'/'_conf05.kraken2'}
+  kraken2 --threads 38 \
+    --confidence 0.05 \
+    --db $db \
+    --report $rpt $f > $out
+done
+
+
+for f in  *_no_bee_no_phix.derep.fa
+do
+  rpt=${f/'.derep.fa'/'_conf10.rpt2'}
+  out=${f/'.derep.fa'/'_conf10.kraken2'}
+  kraken2 --threads 38 \
+    --confidence 0.10 \
+    --db $db \
+    --report $rpt $f > $out
+done
+```
+
+```{r, eval=FALSE}
+library(phyloseq)
+library(psadd)
+library(genefilter)
+
+
+dat = import_biom('no_bee_no_phix_nt.biom', parseFunction=parse_taxonomy_greengenes)
+m = matrix(unlist(strsplit(gsub('.assembled_clean_no_bee_no_phix', '', colnames(otu_table(dat))), '_')), nc=2, byrow=T)
+colnames(otu_table(dat)) = paste(m[,2], m[,1], sep='_')
+sd = data.frame(SampleID=colnames(otu_table(dat)))
+sd = sample_data(sd)
+rownames(sd) = sd$SampleID
+sample_data(dat) = sd
+plot_krona(dat, 'no_bee_no_phix_nt', 'SampleID', trim=T)
+
+dat = import_biom('no_bee_no_phix_refseq.biom', parseFunction=parse_taxonomy_greengenes)
+m = matrix(unlist(strsplit(gsub('.assembled_clean_no_bee_no_phix', '', colnames(otu_table(dat))), '_')), nc=2, byrow=T)
+colnames(otu_table(dat)) = paste(m[,2], m[,1], sep='_')
+sd = data.frame(SampleID=colnames(otu_table(dat)))
+sd = sample_data(sd)
+rownames(sd) = sd$SampleID
+sample_data(dat) = sd
+plot_krona(dat, 'no_bee_no_phix_refseq', 'SampleID', trim=T)
+
+```

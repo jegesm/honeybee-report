@@ -1,0 +1,45 @@
+```{r}
+# Load checkpoint
+load(file='../_checkpoint/2_checkpoint_estrich.RData')
+
+# Create data frame with columns of depending parameters such as Precipitation and GDD (heatsum)
+pd1 = wd[,c('Sampling', 'val')]
+colnames(pd1)[1] = 'grp'
+pd1$str = ''
+pd1$season = pd1$grp
+pd1$cond = ''
+
+tmp = wd[which(wd$Sampling=='March'),c('Precipitation','val')]
+colnames(tmp)[1] = 'grp'
+tmp$str = 'March - Precipitation'
+tmp$season = 'March'
+tmp$cond = 'Precipitation'
+pd1 = rbind(pd1, tmp)
+
+tmp = wd[which(wd$Sampling=='May'),c('Precipitation','val')]
+colnames(tmp)[1] = 'grp'
+tmp$str = 'May - Precipitation'
+tmp$season = 'May'
+tmp$cond = 'Precipitation'
+pd1 = rbind(pd1, tmp)
+
+tmp = wd[which(wd$Sampling=='March'),c('GDD','val')]
+colnames(tmp)[1] = 'grp'
+tmp$str = 'March - GDD'
+tmp$season = 'March'
+tmp$cond = 'GDD'
+pd1 = rbind(pd1, tmp)
+
+tmp = wd[which(wd$Sampling=='May'),c('GDD','val')]
+colnames(tmp)[1] = 'grp'
+tmp$str = 'May - GDD'
+tmp$season = 'May'
+tmp$cond = 'GDD'
+pd1 = rbind(pd1, tmp)
+
+# What does factor do?
+pd1$grp = factor(pd1$grp)
+
+# Save checkpoint
+# save.image(file='data/tmp_pd_Invs-GDD-Prec.RData')
+```

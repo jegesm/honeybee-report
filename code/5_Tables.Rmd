@@ -1,0 +1,194 @@
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide', error=FALSE}
+# Load checkpoint
+load(file='../_checkpoint/2_checkpoint_estrich.RData')
+
+library(xtable)
+library(DT)
+library(phyloseq)
+wd = faj
+taxa_names(wd) = tax_table(wd)[,'Species']
+```
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+library(kableExtra)
+```
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+load(file='../_checkpoint/5_checkpoint_pd_tables.RData')
+```
+
+Associations between seasonal conditions, climatic condition levels and the abundance of core bacteriome species were examined using negative binomial generalized linear models [[42](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0273844#pone.0273844.ref042)]. The abundance of B. apis (FC: 15.41, q<0.00001), B. asteroides (FC: 1.61, q = 0.0084), C. sp. AMU001 (FC: 2.46, q = 0.00001), L. helsingborgensis (FC: 1.7, q = 0.008) and S. alvi (FC: 1.49, q = 0.011) significantly increased from March to May. In the same comparison, the abundance of L. apis (FC: 0.64, q = 0.0066), L. bombi (FC: 0.64, q = 0.0052), L. kullabergensis (FC: 0.57, q = 0.00056) and L. mellis (FC: 0.64, q = 0.0052) was significantly decreased. In the samples collected in March, the abundance of L. kunkeei (FC: 3.86, q = 0.094) was significantly higher in warmer regions than in cooler ones. In the same period, the abundance of B. apis (FC: 0.02, q<0.00001) and B. asteroides (FC: 0.47, q = 0.0027) was significantly lower in warmer LMUs than in cooler ones. In March samples, the abundance of L. kunkeei (FC: 0.13, q = 0.011) was significantly lower in districts with more precipitation than in LMUs with less precipitation. In samples collected in May, none of the core bacteriome species showed significant alterations in abundance neither by GDD categories nor by the precipitation levels. The relative abundance distribution of significantly different species per group is summarized in [[S1 Fig](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0273844#pone.0273844.s001)].
+
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+# c('GDD','Upper','Lower')
+tab2 = df2 %>% 
+dplyr::mutate(
+  FC = paste(round(2^log2FoldChange,2), ' (', round(2^(log2FoldChange-(1.96*lfcSE)),2), ', ', round(2^(log2FoldChange+(1.96*lfcSE)),2), ')', sep='')
+) %>% 
+  dplyr::arrange(Species) %>%
+dplyr::select(Species, baseMean, FC, padj)
+
+# c('Precipitation','Upper','Lower')
+tab3 = df3 %>% 
+dplyr::mutate(
+  FC = paste(round(2^log2FoldChange,2), ' (', round(2^(log2FoldChange-(1.96*lfcSE)),2), ', ', round(2^(log2FoldChange+(1.96*lfcSE)),2), ')', sep='')
+) %>% 
+  dplyr::arrange(Species) %>%
+dplyr::select(Species, baseMean, FC, padj)
+```
+
+
+```{r}
+dplyr::inner_join(tab2, tab3, by='Species') %>% 
+#arrange(Species) %>%
+  dplyr::rename('Mean - gdd'='baseMean.x', 'FC.gdd'='FC.x', 'padj.gdd'='padj.x', 'Mean - prec'='baseMean.y', 'FC.prec'='FC.y', 'padj.prec'='padj.y') %>%
+  kable(caption="Abundance alterations of core bacteriome by climatic conditions in March") %>%
+    kable_styling("striped", full_width = F) %>%
+  add_header_above(c(" March samples " = 1, "GDD Warmer vs Cooler" = 3, "Precipitation More vs Less" = 3))
+```
+
+<!-- ```{r, results='asis', message=FALSE, warning=FALSE} -->
+<!-- # inner_join(tab2, tab3, by='Species') %>%  -->
+<!-- # arrange(Species) %>% -->
+<!-- # xtable(digits=c(0,0,2,0,5,2,0,5)) %>% -->
+<!-- # datatable(caption="Hello") %>% -->
+<!-- #       formatRound(columns=c('Species', 'baseMean.x', 'FC.x', 'padj.x', 'baseMean.y', 'FC.y', 'padj.y'), digits=4) -->
+<!-- # print(include.rownames=F, booktabs=T) -->
+<!-- ``` -->
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+
+# c('GDD','Upper','Lower')
+tab4 = df4 %>% 
+mutate(
+  FC = paste(round(2^log2FoldChange,2), ' (', round(2^(log2FoldChange-(1.96*lfcSE)),2), ', ', round(2^(log2FoldChange+(1.96*lfcSE)),2), ')', sep='')
+) %>% 
+  arrange(Species) %>%
+dplyr::select(Species, baseMean, FC, padj)
+
+# c('Precipitation','Upper','Lower')
+tab5 = df5 %>% 
+mutate(
+  FC = paste(round(2^log2FoldChange,2), ' (', round(2^(log2FoldChange-(1.96*lfcSE)),2), ', ', round(2^(log2FoldChange+(1.96*lfcSE)),2), ')', sep='')
+) %>% 
+   arrange(Species) %>%
+dplyr::select(Species, baseMean, FC, padj)
+```
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+dplyr::inner_join(tab4, tab5, by='Species') %>% 
+    dplyr::rename('Mean - gdd'='baseMean.x', 'FC.gdd'='FC.x', 'padj.gdd'='padj.x', 'Mean - prec'='baseMean.y', 'FC.prec'='FC.y', 'padj.prec'='padj.y') %>%
+#arrange(Species) %>%
+      kable(caption="Abundance alterations of core bacteriome by climatic conditions in May") %>%
+  kable_styling("striped", full_width = F)  %>%
+  add_header_above(c(" May samples " = 1, "GDD Warmer vs Cooler" = 3, "Precipitation More vs Less" = 3))
+#xtable(digits=c(0,0,2,0,5,2,0,5)) %>%
+#datatable(caption="Hello") %>%
+#      formatRound(columns=c('Species', 'baseMean.x', 'FC.x', 'padj.x', 'baseMean.y', 'FC.y', 'padj.y'), digits=4)
+```
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+tab1 = df1 %>% 
+dplyr::mutate(
+  FC = paste(round(2^log2FoldChange,2), ' (', round(2^(log2FoldChange-(1.96*lfcSE)),2), ', ', round(2^(log2FoldChange+(1.96*lfcSE)),2), ')', sep='')
+) %>% 
+  dplyr::arrange(Species) %>%
+dplyr::select(Species, baseMean, FC, padj) 
+
+row.names(tab1)=NULL
+```
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+tab1 %>% 
+dplyr::arrange(Species) %>%
+    dplyr::rename('Mean'='baseMean') %>%
+    kable(caption="Abundance alterations of core bacteriome from March to May. Table 2. Abundance alterations of core bacteriome by seasonal and climatic conditions.\nA negative binomial model estimated the association between species abundance of core bacteriome and sampling seasons, GDD- and precipitation level.\nhttps://doi.org/10.1371/journal.pone.0273844.t002") %>%
+kable_styling("striped", full_width = F)  %>%
+  add_header_above(c(" March vs May samples " = 1, " " = 3))
+```
+
+<!-- ```{r} -->
+<!-- #pack_rows("March", 1, 15) %>% -->
+<!--   #pack_rows("May", 16, 30) -->
+<!-- #xtable() %>% -->
+<!-- #  datatable(caption="Hello") %>% -->
+<!-- #      formatRound(columns=c('baseMean', 'FC'), digits=2) %>% -->
+<!-- #  formatRound(columns=c('padj'), digits=5) -->
+<!-- #print(include.rownames=F, booktabs=T) -->
+<!-- ``` -->
+
+
+
+<!-- ## Not needed? -->
+
+<!-- ```{r, results='asis', message=FALSE, warning=FALSE} -->
+<!-- #library(ShortRead) -->
+
+<!-- # setwd('/v/projects/honeybee/visontai/final') -->
+<!-- #  -->
+<!-- # fs = list.files(pattern='_1.fastq') -->
+<!-- # lens = c() -->
+<!-- # for(f in fs){ -->
+<!-- #  a = readFastq(f) -->
+<!-- #  lens = c(lens, length(a)) -->
+<!-- # } -->
+
+
+<!-- #top_gap <- -->
+<!--   inner_join( -->
+<!--   inner_join( -->
+<!--     transform_sample_counts(wd, function(x){x / sum(x)}) %>% -->
+<!--     psmelt() %>%  -->
+<!--     filter(Sampling=='March') %>%  -->
+<!--     group_by(Species) %>%  -->
+<!--     summarise( -->
+<!--       March = mean(Abundance)*100 -->
+<!--     ), -->
+<!--     transform_sample_counts(wd, function(x){x / sum(x)}) %>% -->
+<!--     psmelt() %>%  -->
+<!--     filter(Sampling=='May') %>%  -->
+<!--     group_by(Species) %>%  -->
+<!--     summarise( -->
+<!--       May = mean(Abundance)*100 -->
+<!--     )   -->
+<!--   ),  -->
+<!--   df5 -->
+<!-- ) %>%  -->
+<!-- dplyr::select(Species, March, May, log2FoldChange, lfcSE, pvalue, padj) %>%  -->
+<!-- arrange(desc(abs(log2FoldChange)), padj) %>% -->
+<!-- xtable(digits=c(0,0,2,2,2,2,4,4))  %>% -->
+<!-- datatable(caption="Hello") %>% -->
+<!--       formatRound(columns=c('Species', 'March', 'May', 'log2FoldChange', 'lfcSE', 'pvalue', 'padj'), digits=4) -->
+<!-- #print.xtable(include.rownames=F, booktabs=T) -->
+<!-- #knitr::kable(top_gap,caption = 'Abundance alterations of core bacteriome by seasonal and climatic conditions. <br> <a href="https://doi.org/10.1371/journal.pone.0273844.t001">https://doi.org/10.1371/journal.pone.0273844.t001</a>', digits=2) -->
+<!-- ``` -->
+
+<!-- ```{r, results='asis', message=FALSE, warning=FALSE} -->
+
+<!-- inner_join( -->
+<!--   inner_join( -->
+<!--     transform_sample_counts(wd, function(x){x / sum(x)}) %>% -->
+<!--     psmelt() %>%  -->
+<!--     filter(GDD=='Lower') %>%  -->
+<!--     group_by(Species) %>%  -->
+<!--     summarise( -->
+<!--       Cooler = mean(Abundance)*100 -->
+<!--     ), -->
+<!--     transform_sample_counts(wd, function(x){x / sum(x)}) %>% -->
+<!--     psmelt() %>%  -->
+<!--     filter(GDD=='Upper') %>%  -->
+<!--     group_by(Species) %>%  -->
+<!--     summarise( -->
+<!--       Warmer = mean(Abundance)*100 -->
+<!--     )   -->
+<!--   ),  -->
+<!--   df6 -->
+<!-- ) %>%  -->
+<!-- dplyr::select(Species, Cooler, Warmer, log2FoldChange, lfcSE, pvalue, padj) %>%  -->
+<!-- arrange(desc(abs(log2FoldChange)), padj) %>% -->
+<!-- xtable(digits=c(0,0,2,2,2,2,4,4))  %>% -->
+<!-- datatable(caption="Hello") %>% -->
+<!--       formatRound(columns=c('Species', 'Cooler', 'Warmer', 'log2FoldChange', 'lfcSE', 'pvalue', 'padj'), digits=4) -->
+<!-- # print(include.rownames=F, booktabs=T) -->
+<!-- ``` -->

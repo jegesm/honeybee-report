@@ -1,0 +1,202 @@
+To examine statistically whether the bacterial species composition differed by climatic or seasonal conditions, PERMANOVA (Permutational Multivariate Analysis of Variance [[39](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0273844#pone.0273844.ref039)]) and PERMDISP2 [[40](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0273844#pone.0273844.ref040)] procedures were performed using vegan package [[41](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0273844#pone.0273844.ref041)] in R [[27](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0273844#pone.0273844.ref027)].
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='hide', error=FALSE}
+library(microbiome);
+
+# Load checkpoint
+load(file='../_checkpoint/2_checkpoint_estrich.RData')
+
+taxa = 'Species'
+pset = faj
+meta = meta(pset);
+
+pseq.rel = microbiome::transform(pset, "compositional");
+otu = abundances(pseq.rel);
+rownames(otu) = tax_table(pseq.rel)[,taxa];
+meta = meta(pseq.rel);
+set.seed(2019);
+library(vegan);
+permanova = adonis(t(otu) ~ Sampling, data=meta, permutations=999, method="bray");
+dist = vegdist(t(otu));
+# https://jonlefcheck.net/2012/10/24/nmds-tutorial-in-r/
+
+as.data.frame(permanova$aov.tab)["Sampling", "Pr(>F)"];
+anova(betadisper(dist, meta$Sampling));
+```
+
+```{r, echo=FALSE, warning=FALSE, results='hide'}
+pset = subset_samples(faj, Sampling=='March')
+opseq = transform_sample_counts(pset, function(x){x / sum(x)})
+ord = ordinate(opseq, "NMDS", "bray");
+round(ord$stress,3)
+
+pseq.rel = microbiome::transform(pset, "compositional")
+otu = abundances(pseq.rel)
+rownames(otu) = tax_table(pseq.rel)[,taxa]
+meta = meta(pseq.rel)
+
+set.seed(2019)
+permanova = adonis(t(otu) ~ GDD, data=meta, permutations=999, method="bray")
+dist = vegdist(t(otu))
+
+print(as.data.frame(permanova$aov.tab)["GDD", "Pr(>F)"])
+anova(betadisper(dist, meta$GDD))
+```
+
+
+```{r, echo=FALSE, warning=FALSE, results='hide'}
+set.seed(2019)
+permanova = adonis(t(otu) ~ Precipitation, data=meta, permutations=999, method="bray")
+dist = vegdist(t(otu))
+
+print(as.data.frame(permanova$aov.tab)["Precipitation", "Pr(>F)"])
+anova(betadisper(dist, meta$Precipitation))
+```
+
+
+```{r, message=FALSE, warning=FALSE, include=FALSE, results='hide'}
+pset = subset_samples(faj, Sampling=='May')
+opseq = transform_sample_counts(pset, function(x){x / sum(x)})
+ord = ordinate(opseq, "NMDS", "bray")
+round(ord$stress,3)
+
+pseq.rel = microbiome::transform(pset, "compositional")
+otu = abundances(pseq.rel)
+rownames(otu) = tax_table(pseq.rel)[,taxa]
+meta = meta(pseq.rel)
+
+set.seed(2019)
+permanova = adonis(t(otu) ~ GDD, data=meta, permutations=999, method="bray")
+dist = vegdist(t(otu))
+
+print(as.data.frame(permanova$aov.tab)["GDD", "Pr(>F)"])
+anova(betadisper(dist, meta$GDD))
+```
+
+
+```{r, echo=FALSE, warning=FALSE, results='hide'}
+set.seed(2019)
+permanova = adonis(t(otu) ~ Precipitation, data=meta, permutations=999, method="bray")
+dist = vegdist(t(otu))
+
+print(as.data.frame(permanova$aov.tab)["Precipitation", "Pr(>F)"])
+anova(betadisper(dist, meta$Precipitation))
+```
+
+```{r}
+# prepare plot
+tr_glom = transform_sample_counts(faj, function(x){x / sum(x)})
+txids = core_members(tr_glom, detection=1e-03, prevalence=0.50)
+pseq.core = faj
+tax_table(pseq.core) = as(tax_table(faj), "matrix")[txids,]
+
+pset = pseq.core
+meta = meta(pset)
+
+library(RColorBrewer)
+getPalette = colorRampPalette(brewer.pal(11, 'Spectral'))
+
+save.image(file='../_checkpoint/4_checkpoint_corebact.RData')
+```
+
+The core bacteriome members having relative abundance above 0.1% in at least half of the samples are Bartonella apis, Bifidobacterium asteroides, Bifidobacterium coryneforme, Bifidobacterium indicum, Commensalibacter sp. AMU001, Frischella perrara, Gilliamella apicola, Lactobacillus apis, Lactobacillus bombi, Lactobacillus helsingborgensis, Lactobacillus kullabergensis, Lactobacillus kunkeei, Lactobacillus mellis, Lactobacillus sp. wkB8 and Snodgrassella alvi. The relative abundances of each apiary’s core bacteriome species are plotted by sampling periods and environmental strata in the figure below. The table shows the overall and grouped mean and standard deviation of core bacteriome species’ relative abundances.
+
+```{r, fig.dim=c(8, 8), fig.cap = "Core bacteriome composition of honey bee gut samples. The relative abundance is plotted for the first (March) and second (May) sampling. Besides the bacterial species of the core bacteriome, the environmental condition (growing degree-day (GDD) and precipitation) categories of sampling places are also marked. <br>https://doi.org/10.1371/journal.pone.0273844.g005"}
+
+library(ggnewscale)
+library(forcats)
+transform_sample_counts(pset, function(x){x / sum(x)}) %>%
+psmelt() %>% 
+ggplot(mapping = aes(x=fct_rev(factor(id)), y=Abundance*100)) + 
+geom_bar(mapping = aes(x=fct_rev(factor(id)), y=Abundance*100, fill=Species), stat='identity') + 
+# scale_fill_brewer(palette="Spectral") +
+scale_fill_manual(values = getPalette(dim(tax_table(pseq.core))[1])) +
+xlab('Apiary ID') + ylab('Abundance (%)') + 
+facet_wrap( ~ Sampling) + 
+theme_bw() + theme(panel.grid.major = element_blank()) + 
+coord_flip() + 
+new_scale_fill() + 
+geom_tile(data=meta, aes(x=factor(id), y=-10, fill=GDD), height=4) + 
+scale_fill_manual(values = c("grey", "red"), name="GDD", breaks=c('Lower', 'Upper'), labels=c('Cooler', 'Warmer')) +
+new_scale_fill() + 
+geom_tile(data=meta, mapping=aes(x=factor(id), y=-4, fill=Precipitation), height=4) + 
+scale_fill_manual(values = c("brown", "blue"), name="Precipitation",breaks=c('Lower', 'Upper'), labels=c('Less', 'More')) +
+scale_y_continuous(expand = c(0.02,0)) 
+  
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide', error=FALSE}
+library(xtable)
+library(DT)
+wd = pset
+taxa_names(wd) = tax_table(wd)[,'Species']
+```
+
+```{r, echo=FALSE, results='asis', message=FALSE, warning=FALSE}
+library(kableExtra)
+```
+
+```{r, results='asis', message=FALSE, warning=FALSE}
+
+month = 'March'
+month = 'May'
+inner_join(
+inner_join(
+inner_join(
+inner_join(
+wd %>% 
+  transform_sample_counts(function(x){x / sum(x)}) %>%
+  psmelt() %>% 
+  group_by(Species,Sampling) %>% 
+  summarise(
+    AllSamplesMean = paste(round(mean(Abundance)*100,2), ' (', round(sd(Abundance)*100,2), ')', sep='')
+  ), 
+wd %>% 
+  transform_sample_counts(function(x){x / sum(x)}) %>%
+  psmelt() %>% 
+  filter(GDD=='Lower') %>% 
+  group_by(Species,Sampling) %>% 
+  summarise(
+    Cooler = paste(round(mean(Abundance)*100,2), ' (', round(sd(Abundance)*100,2), ')', sep='')
+  )
+),
+wd %>% 
+  transform_sample_counts(function(x){x / sum(x)}) %>%
+  psmelt() %>% 
+  filter(GDD=='Upper') %>% 
+  group_by(Species,Sampling) %>% 
+  summarise(
+    Warmer = paste(round(mean(Abundance)*100,2), ' (', round(sd(Abundance)*100,2), ')', sep='')
+  )
+),
+wd %>% 
+  transform_sample_counts(function(x){x / sum(x)}) %>%
+  psmelt() %>% 
+  filter(Precipitation=='Lower') %>% 
+  group_by(Species,Sampling) %>% 
+  summarise(
+    Less = paste(round(mean(Abundance)*100,2), ' (', round(sd(Abundance)*100,2), ')', sep='')
+  )
+),
+wd %>% 
+  transform_sample_counts(function(x){x / sum(x)}) %>%
+  psmelt() %>% 
+  filter(Precipitation=='Upper') %>% 
+  group_by(Species,Sampling) %>%
+  #group_by(Species) %>% 
+  summarise(
+    More = paste(round(mean(Abundance)*100,2), ' (', round(sd(Abundance)*100,2), ')', sep='')
+  )
+) %>%
+  arrange(Sampling) %>%
+  select(-Sampling) %>%
+#xtable() %>%
+  kable(caption="Relative abundances by environmental and seasonal categories.<br>https://doi.org/10.1371/journal.pone.0273844.t001") %>%
+#datatable(caption="Hello") %>%
+      #formatRound(columns=c('AllSamplesMean', 'Cooler', 'Warmer', 'Less', 'More'), digits=4) %>%
+  kable_styling("striped", full_width = F) %>%
+  pack_rows("March", 1, 15) %>%
+  pack_rows("May", 16, 30)
+#print(include.rownames=F, booktabs=T, type="html")
+```
+

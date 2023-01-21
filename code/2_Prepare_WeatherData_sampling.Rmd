@@ -1,0 +1,139 @@
+```{r}
+library(RSQLite)
+library(weathermetrics)
+library(sf)
+library(spsurvey)
+library(raster)
+library(tmap)
+library(RpostGIS)
+options(stringsAsFactors=F)
+```
+
+```{r}
+drv = dbDriver("SQLite")
+con = dbConnect(drv, dbname='../data/db.sqlite', loadable.extensions=TRUE)
+lext = dbGetQuery(con, "SELECT load_extension('/usr/lib/x86_64-linux-gnu/mod_spatialite.so')")
+ 
+sql = "select id as gid, name, st_astext(geom) as geom from admin7"
+jaras.tab = dbGetQuery(con, sql)
+jaras.sp = wkt2sp(geoms=jaras.tab, gcol='geom', idcol='gid')
+proj4string(jaras.sp) = CRS('+init=epsg:4326')
+jaras.sf = st_as_sf(jaras.sp)
+st_crs(jaras.sf) = 4326
+jaras.sf = st_transform(jaras.sf, 23700)
+ 
+jaras.c = st_centroid(jaras.sf)
+jaras.c.sp = as_Spatial(jaras.c)
+
+##################################################################################
+ 
+jaras.c.sp@data$selected=1:175
+ 
+##################################################################################
+fs = list.files(path='../weatherdata', pattern='HU_SFC.nc$', full.names=T)
+fs = fs[grep('interim_0.125', fs)]
+
+res.m = matrix(nr=length(jaras.sp), nc=length(fs))
+
+for(n in 1:length(fs)){
+ f = fs[n]
+ T2m = brick(f, varname='2t')
+ j.lst = extract(T2m, jaras.sp)
+ for(i in 1:length(j.lst)){
+   pj = apply(j.lst[[i]], 2, mean)
+   h6 = matrix(pj, nc=4, byrow=T)
+   rownames(h6) = gsub('00.00.00', '', gsub('X', '', matrix(names(pj), nc=4, byrow=T)[,1]))
+   napi = convert_temperature(rowMeans(h6), old_metric='kelvin', new_metric='celsius')
+   gdd = napi-10
+   gdd[which(gdd<0)]=0
+   res.m[i,n] = sum(gdd)
+ }
+
+}
+
+jaras.sf$gdd = rowMeans(res.m)
+
+fs = list.files(path='../weatherdata', pattern='HU_SFC.prec.nc$', full.names=T)
+
+fs = fs[grep('interim_0.125', fs)]
+
+res.m = matrix(nr=length(jaras.sp), nc=length(fs))
+for(n in 1:length(fs)){
+ f = fs[n]
+ tp = brick(f, varname='tp')
+ j.lst = extract(tp, jaras.sp)
+ for(i in 1:length(j.lst)){
+   pj = apply(j.lst[[i]], 2, mean)
+   h6 = matrix(pj, nc=2, byrow=T)
+   rownames(h6) = substr(gsub('X', '', matrix(names(pj), nc=2, byrow=T)[,1]), 1,11)
+   res.m[i,n] = sum(h6)*1000
+ }
+}
+jaras.sf$y10prec = rowMeans(res.m)
+
+```
+
+```{r}
+# Here we select sampling locations
+# Since it depends on the selected levels for each stratum, the random seed of grts and more inportantly the actual human/bee family factor the original data is saved into data/Original_env.RData
+jaras.sf$gddkatb = cut(jaras.sf$gdd, breaks=c(0, 1306, 1650, 2000))
+levels(jaras.sf$gddkatb) = c('-', 'I', 'J')
+
+jaras.sf$preckatb = cut(jaras.sf$y10prec, breaks=c(0,533,580,741))
+levels(jaras.sf$preckatb) = c('-', 'O', 'P')
+
+jaras.sf$kombib = paste(jaras.sf$gddkatb, jaras.sf$preckatb, sep='')
+jaras.c.sp@data$kombib = jaras.sf$kombib
+
+round((table(jaras.c.sp@data$kombib)/175)*20)
+
+strata_n = c(IO=3, IP=7, JO=5, JP=5)
+
+set.seed(12)
+
+set.seed(1970)
+library(spsurvey)
+strat_eqprob = grts(jaras.sf, n_base=strata_n, stratum_var = "kombib")
+
+library(tmap)
+tm_shape(jaras.sf) +
+  tm_polygons("kombib",
+              title="GDD x TP",
+              legend.format=list(text.separator='-'), textNA='No', lwd=0
+  )  +
+  tm_shape(strat_eqprob$sites_base) +
+  tm_dots(size=1.0) +
+  tm_layout(inner.margins=0, legend.position = c(.85, .1), outer.margins=0, frame=F)
+
+strat_eqprob$stratum = as.character(strat_eqprob$stratum)
+
+tm_shape(jaras.sf) +
+  tm_polygons("kombib",
+              title="GDD x TP",
+              legend.format=list(text.separator='-'), textNA='No', lwd=0
+  )  +
+  tm_shape(strat_eqprob$sites_base) +
+  tm_dots(size=1.0) +
+  tm_layout(inner.margins=0, legend.position = c(.85, .1), outer.margins=0, frame=F)
+
+```
+
+<!-- ```{r} -->
+<!-- wd = jaras.tab[,-3] -->
+
+<!-- res = merge(wd, strat_eqprob, by.x='gid', by.y='selected') -->
+
+<!-- res = res[,c('name','stratum')] -->
+
+<!-- res = res[sort.list(res$name),] -->
+<!-- rownames(res) = 1:20 -->
+
+<!-- library(xtable) -->
+
+<!-- x.tab = xtable(res, caption='Mintavételi járások', label='tab01') -->
+<!-- print(x.tab, caption.placement='top', include.rownames=T, booktabs=T) -->
+<!-- ``` -->
+
+```{r}
+save.image(file='../_checkpoint/1_checkpoint_weather.RData')
+```

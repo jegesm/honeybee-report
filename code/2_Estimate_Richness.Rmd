@@ -1,0 +1,136 @@
+```{r}
+library(sf)
+# Using the original sampling data
+load('../data/Original_env.RData')
+
+# Load checkpoint
+load('../_checkpoint/1_checkpoint_weather.RData')
+# otherwise it would be continuing like this
+jaras.sf = st_transform(jaras.sf, 4326)
+# env = jaras.sf
+```
+
+```{r}
+# Initial samples from these locations
+wd = mintak[which(mintak$sid==1),]
+
+pts = st_as_sf(wd, coords=c('lon','lat'), crs=4326)
+sf::sf_use_s2(FALSE) 
+
+ff = st_within(pts, jaras.sf)
+jin1 = unlist(ff)
+
+base1 = cbind(wd, env[jin1,])
+```
+
+```{r}
+# Follow up samples from the same locations
+wd = mintak[which(mintak$sid==2),]
+pts = st_as_sf(wd, coords=c('lon','lat'), crs=4326)
+ff = st_within(pts, jaras.sf)
+
+jin2 = unlist(ff)
+base2 = cbind(wd, env[jin2,])
+
+# Does replacement from a LAU to another matter?
+smpls$jarasvalt = ifelse(jin1!=jin2, 'igen', 'nem')
+
+# Replacement from one climatic category to another
+smpls$envalt = ifelse(env[jin2,'kombib']!=smpls$grp, 'igen', 'nem')
+
+base = rbind(base1, base2)
+base = merge(smpls, base, by.x='id', by.y='meheszet')
+base$kid = paste(formatC(base$id, width=2, flag='0'), '_s', base$sid, sep='')
+
+save.image(file='../_checkpoint/2_checkpoint_base.RData')
+# load checkpoint
+# load('../_checkpoint/2_checkpoint_base.RData')
+
+library(phyloseq)
+
+# Loading taxon data. This is the output of the genome sequencing pipeline in section ???
+biom = '../data/no_bee_no_phix_nt.biom'
+dat = import_biom(biom, parseFunction=parse_taxonomy_greengenes)
+m = matrix(unlist(strsplit(gsub('.assembled_clean_no_bee_no_phix', '', colnames(otu_table(dat))), '_')), nc=2, byrow=T)
+colnames(otu_table(dat)) = paste(m[,2], m[,1], sep='_')
+sd = data.frame(SampleID=colnames(otu_table(dat)))
+sd$soid = 1:dim(sd)[1]
+
+# Merge biom data with sampling metadata
+sd = merge(sd, base, by.x='SampleID', by.y='kid')
+sd = sd[sort.list(sd$soid),]
+
+# Initial data -> March, follow up data in May
+sd$Sampling = ifelse(sd$sid==1, 'March', 'May')
+
+# Heatsum, two categories, Lower and Upper
+sd$GDD = ifelse(as.character(sd$gddkatb)=='I', 'Lower', 'Upper')
+
+# Precipitation, two categories, Lower and Upper
+sd$Precipitation = ifelse(as.character(sd$preckatb)=='O', 'Lower', 'Upper')
+sd$aid = paste('s', sd$id, sep='')
+
+# Convert to sample_data (phyloseq)
+sd = sample_data(sd)
+rownames(sd) = sd$SampleID
+
+# ???
+sample_data(dat) = sd
+
+save(dat, file='../_checkpoint/2_checkpoint_dat.RData')
+# load('../_checkpoint/2_checkpoint_dat.RData')
+
+# Get only bacteria
+pseq = subset_taxa(dat, Kingdom=='Bacteria')
+pseq = subset_taxa(pseq, !is.na(Class))
+
+pseq = prune_taxa(taxa_sums(pseq)>0, pseq)
+
+faj = subset_taxa(pseq, !is.na(Species))
+tax_table(faj)[,7] = paste(tax_table(faj)[,6], tax_table(faj)[,7])
+
+
+# Calculate depth, the Inverse Simpson index
+#What does rarefy_even_depth do? same library size?
+#  Deprecated funciton? `Please note that the authors of phyloseq do not advocate using this as a normalization procedure, despite its recent popularity. Our justifications for using alternative approaches to address disparities in library sizes have been made available as http://dx.plos.org/10.1371/journal.pcbi.1003531{an article in PLoS Computational Biology}`
+#What is "Observed"?
+  
+depth = c()
+i = 1
+pseq.rarified = rarefy_even_depth(faj, rngseed=i)
+depth = c(depth, as.numeric(colSums(otu_table(pseq.rarified))[1]))
+Observed = estimate_richness(pseq.rarified, measures='Observed')
+InvSimpson = estimate_richness(pseq.rarified, measures='InvSimpson')
+
+
+for(i in 501:1000){
+  pseq.rarified = rarefy_even_depth(faj, rngseed=i)
+  depth = c(depth, as.numeric(colSums(otu_table(pseq.rarified))[1]))
+  Observed = cbind(Observed, estimate_richness(pseq.rarified, measures='Observed'))
+  InvSimpson = cbind(InvSimpson, estimate_richness(pseq.rarified, measures='InvSimpson'))
+}
+
+# Get average
+om = rowMeans(Observed)
+ism = rowMeans(InvSimpson)
+
+library(dplyr)
+msd = data.frame(sample_data(faj)) %>% 
+  dplyr::select(SampleID, Sampling, GDD, Precipitation)
+
+obst = data.frame(SampleID=gsub('X', '', names(om)), val=as.numeric(om))
+
+ist = data.frame(SampleID=gsub('X', '', names(ism)), val=as.numeric(ism))
+# ist$SampleID = matrix(unlist(strsplit(ist$sid, '_')), nc=2, byrow=T)[,2]
+
+wd = inner_join(msd, ist)
+wd$GDD = ifelse(wd$GDD=='Lower', 'Cooler', 'Warmer')
+wd$Precipitation = ifelse(wd$Precipitation=='Lower', 'Less', 'More')
+
+wd$loc = paste('l', matrix(unlist(strsplit(wd$SampleID, '_')), nc=2, byrow=T)[,1], sep='')
+```
+
+```{r}
+save.image(file='../_checkpoint/2_checkpoint_estrich.RData')
+```
+

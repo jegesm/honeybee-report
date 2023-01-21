@@ -1,0 +1,248 @@
+```{r echo=FALSE, warning=FALSE, results='hide', error=FALSE,message=FALSE}
+load('../_checkpoint/1_checkpoint_weather.RData')
+library(spsurvey)
+library(tmap)
+```
+
+There are several approaches how one could do 40 samplings:
+
+1. [Randomly select 40 LAU](#randomly-select-40-lau) (local administrative units) with equal probability
+
+2. [Select 20 LAUs](#select-from-three-categories-of-precipitation-and-gdd), divide the country into three categories regarding the precipitation and GDD
+
+3. [Select 20 LAUs](#select-from-two-categories-of-precipitation-and-gdd), divide the country into two categories regarding the precipitation and GDD
+
+In approach 2) and 3) we ensure that our samples are representative of Hungary at the climatic condition level, the sample size of each previously defined strata was proportional to the stratifying GDD and precipitation categories’ country-wide frequency. The R package spsurvey was used for the stratified spatial random sampling of the LAUs. One apiary was selected from each appointed LAU (making the total number of selected apiaries 20). To minimise the effect of the keeping conditions on our results, each apiary was selected based on personal conversations. Since in Hungary mainly Carniolan honey bees (Apis mellifera carnica) are in operation, the samples were drawn from colonies of that subspecies.
+
+Among the environmental factors the accumulated GDD is used in modelling for both plant fenology and poikilotherm animal and therefore for honeybees as well (Petersen et al., 2013; Gilley et al., 2018). 
+
+## Randomly select 40 LAU
+```{r, fig.keep='all', fig.cap="Random sampling, all of the LAUs have the same probability to be chosen."}
+jaras.c.sp@data$selected=1
+n = 40
+
+set.seed(12)
+sels = grts(sframe = jaras.sf,  n_base = 40)
+tm_shape(jaras.sf) + 
+tm_polygons(col='white') +
+tm_shape(sels$sites_base) + tm_dots('selected', size=0.3, col = 'green', auto.palette.mapping=FALSE, shape = 21) +
+#tm_dots('selected', size=0.3, palette='Dark2', auto.palette.mapping=FALSE, shape =21) +
+tm_layout(inner.margins=0, legend.position = c(.85, .1), outer.margins=0, frame=F)
+
+```
+
+
+
+
+## Environmental factors (Heat sum, GDD)
+```{r,  fig.keep='all', fig.cap="Average growing degree days (GDD) between 2008. – 2017.<br>If we would like to have a representative sampling for GDD then we have to select LAUs according to the proportion of each GDD category."}
+st_write(obj=jaras.sf, driver='ESRI Shapefile', dsn='TDK', layer_options='ENCODING=UTF-8', delete_layer=T);
+
+ library(RColorBrewer)
+tm_shape(jaras.sf) + 
+tm_polygons("gdd", 
+  palette=brewer.pal(9,'Greens'), 
+  style='fixed', breaks=seq(1306,  2000, by=70),
+  title="GDD", 
+  legend.format=list(text.separator='-'), textNA='No', lwd=0
+)  + 
+tm_layout(frame=F, legend.frame=F, legend.show=T, 
+  legend.position=c('right', 'bottom')
+)
+```
+
+```{r , results='hide'}
+jaras.sf$gddkat = cut(jaras.sf$gdd, breaks=c(0, 1306, 1650, 1850, 2000))
+levels(jaras.sf$gddkat) = c('-', 'A', 'B', 'C');
+#print("t")
+```
+
+```{r,  results='hide', fig.cap="Average GDD split into three levels between 2008. – 2017. "}
+tm_shape(jaras.sf) + 
+tm_polygons("gddkat", 
+  palette=brewer.pal(9,'Greens')[c(1,3,6,9)], 
+  title="GDD", 
+  legend.format=list(text.separator='-'), textNA='No', lwd=0
+)  + 
+tm_layout(frame=F, legend.frame=F, legend.show=T, 
+  legend.position=c('right', 'bottom')
+)
+```
+
+
+```{r, results='hide',fig.cap="Number of samples in each category. That is used for the grts function"}
+
+#jaras.c.sp@data$gdd = cut(jaras.sf$gdd, breaks=c(0, 8, 12, 13, 14))
+jaras.c.sp@data$gdd = cut(jaras.sf$gdd, breaks=c(0, 1306, 1650, 1770, 2000))
+levels(jaras.c.sp@data$gdd) = c('-', 'A', 'B', 'C')
+round((table(jaras.c.sp@data$gdd)/175)*40)
+```
+
+```{r, fig.cap="Sampling sites selected according to GDD categories"}
+strata_n = c(A=20, B=13, C=7);
+
+set.seed(12)
+sels = grts(sframe = jaras.sf,  n_base = strata_n, stratum_var = 'gddkat')
+
+#proj4string(sels) = CRS('+init=epsg:23700')
+
+tm_shape(jaras.sf) + 
+tm_polygons("gddkat", 
+  palette=brewer.pal(9,'Greens')[c(1,3,6,9)], 
+  title="GDD", 
+  legend.format=list(text.separator='-'), textNA='No', lwd=0
+) +
+tm_shape(sels$sites_base) + 
+tm_dots('stratum', size=0.3, col='yellow', auto.palette.mapping=FALSE) +
+tm_layout(inner.margins=0, legend.position = c(.85, .1), outer.margins=0, frame=F)
+```
+
+
+
+```{r, fig.cap="Average precipitation in Hungary between 2008. – 2017.<br>If we would like to have a representative sampling for GDD then we have to select LAUs according to the proportion of each precipitation category."}
+
+tm_shape(jaras.sf) + 
+tm_polygons("y10prec", 
+  palette=brewer.pal(9,'Blues'), style='fixed', breaks=seq(530, 750, by=20),
+  title="TP (mm)", 
+  legend.format=list(text.separator='-'), textNA='No', lwd=0
+)  + 
+tm_layout(frame=F, legend.frame=F, legend.show=T, 
+  legend.position=c('right', 'bottom')
+)
+```
+
+```{r,  results='hide'}
+quantile(jaras.sf$y10prec, prob=c(0,0.5,0.75,1));
+```
+
+```{r, results='hide', fig.keep='all'}
+jaras.sf$preckat = cut(jaras.sf$y10prec, breaks=c(0,500,600,700,800))
+levels(jaras.sf$preckat) = c('-', 'X', 'Y', 'Z')
+
+tm_shape(jaras.sf) + 
+tm_polygons("preckat", 
+  palette=brewer.pal(9,'Blues')[c(1,3,6,9)], 
+  title="TP-kategória", 
+  legend.format=list(text.separator='-'), textNA='No', lwd=0
+)  + 
+tm_layout(frame=F, legend.frame=F, legend.show=T, 
+  legend.position=c('right', 'bottom')
+)
+```
+
+Number of samples in each category. That is used for the grts function
+```{r, results='hide'}
+jaras.c.sp@data$prec = jaras.sf$preckat
+
+# See how many samples are in each category. That is used for grts
+print(round((table(jaras.c.sp@data$prec)/175)*40))
+```
+
+```{r}
+strata_n = c(X=24, Y=15, Z=1);
+
+set.seed(12)
+sels = grts(sframe = jaras.sf,  n_base = strata_n, stratum_var = 'preckat')
+
+#proj4string(sels$sites_base) = CRS('+init=epsg:23700')
+
+tm_shape(jaras.sf) + 
+tm_polygons("preckat", 
+  palette=brewer.pal(9,'Blues')[c(1,3,6,9)], 
+  title="TP-kategória", 
+  legend.format=list(text.separator='-'), textNA='No', lwd=0
+) +
+tm_shape(sels$sites_base) + 
+tm_dots('stratum', size=0.3, col='yellow', auto.palette.mapping=FALSE) +
+tm_layout(inner.margins=0, legend.position = c(.85, .1), outer.margins=0, frame=F)
+```
+
+## Select from three categories in precipitation and GDD
+Number of samples in each category. That is used for the grts function
+```{r, echo=FALSE,warning=FALSE, results='hide'}
+jaras.sf$kombi = paste(jaras.sf$gddkat, jaras.sf$preckat, sep='')
+
+jaras.c.sp@data$kombi = jaras.sf$kombi
+
+print(round((table(jaras.c.sp@data$kombi)/175)*40))
+strata_n = c(AX=11, AY=8, AZ=1, BX=11, BY=7, CX=2);
+```
+
+```{r}
+set.seed(12)
+sels = grts(sframe = jaras.sf,  n_base = strata_n, stratum_var = 'kombi')
+ 
+#proj4string(sels) = CRS('+init=epsg:23700')
+
+sels$stratum = as.character(sels$stratum)
+
+tm_shape(jaras.sf) + 
+tm_polygons(col='blue') +
+tm_shape(sels$sites_base) + 
+tm_dots('stratum', size=1.0, auto.palette.mapping=F) +
+tm_layout(inner.margins=0, legend.position = c(.85, .1), outer.margins=0, frame=F)
+```
+
+
+## Select from two categories of precipitation and GDD
+```{r}
+jaras.sf$gddkatb = cut(jaras.sf$gdd, breaks=c(0, 1272, 1689, 2000))
+levels(jaras.sf$gddkatb) = c('-', 'I', 'J')
+
+
+tm_shape(jaras.sf) + 
+tm_polygons("gddkatb", 
+  palette=brewer.pal(9,'Greens')[c(1,3,9)], 
+  title="GDD", 
+  legend.format=list(text.separator='-'), textNA='No', lwd=0
+)  + 
+tm_layout(frame=F, legend.frame=F, legend.show=T, 
+  legend.position=c('right', 'bottom')
+)
+```
+
+```{r}
+jaras.sf$preckatb = cut(jaras.sf$y10prec, breaks=c(0,533,580,741))
+levels(jaras.sf$preckatb) = c('-', 'O', 'P')
+
+tm_shape(jaras.sf) + 
+tm_polygons("preckatb", 
+  palette=brewer.pal(9,'Blues')[c(1,3,9)], 
+  title="TP-kategória", 
+  legend.format=list(text.separator='-'), textNA='No', lwd=0
+)  + 
+tm_layout(frame=F, legend.frame=F, legend.show=T, 
+  legend.position=c('right', 'bottom')
+)
+```
+
+Number of samples in each category. That is used for the grts function
+
+```{r, echo=FALSE, warning=FALSE, results='hide'}
+jaras.sf$kombib = paste(jaras.sf$gddkatb, jaras.sf$preckatb, sep='')
+jaras.c.sp@data$kombib = jaras.sf$kombib
+
+print(round((table(jaras.c.sp@data$kombib)/175)*20))
+
+```
+
+```{r, fig.cap="Climate category spatial pattern and sampling points.<br>The Hungarian local administrative units (LAU) coloured by climatic categories based on growing degree days (GDD) and precipitation of the period 2008–2017. The numbers represent the identification numbers of the sampled apiaries in March (a) and May (b).<br>https://doi.org/10.1371/journal.pone.0273844.g001"}
+strata_n = c(IO=5, IP=8, JO=4, JP=4);
+
+set.seed(2019)
+sels = grts(sframe = jaras.sf,  n_base = strata_n, stratum_var = 'kombib')
+ 
+#proj4string(sels) = CRS('+init=epsg:23700')
+
+sels$stratum = as.character(sels$stratum)
+
+tm_shape(jaras.sf) + 
+tm_polygons(col='blue') +
+tm_shape(sels$sites_base) + 
+tm_dots('stratum', size=1.0) +
+tm_layout(inner.margins=0, legend.position = c(.85, .1), outer.margins=0, frame=F)
+
+```
+
+

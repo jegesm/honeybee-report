@@ -1,0 +1,101 @@
+```{r}
+
+# The results arrived in an excel sheet
+# Here we clean it and check for discrepancies
+
+library(RSQLite)
+library(sp)
+library(sf)
+
+m = matrix(c(1, 'Bácsalmási', 'JO',  
+             2, 'Bicskei', 'IP',  
+             3, 'Ceglédi', 'JO',  
+             4, 'Celldömölki', 'IP',  
+             5, 'Csongrádi', 'JO',  
+             6, 'Derecskei', 'JP',  
+             7, 'Dombóvári', 'JP',  
+             8, 'Edelényi', 'IP',  
+             9, 'Egri', 'IO',  
+             10, 'Hajdúböszörményi', 'JP',  
+             11, 'Hatvani', 'IO',  
+             12, 'Kiskunhalasi', 'JO',  
+             13, 'Miskolci', 'IP',  
+             14, 'Nagyatádi', 'JP',  
+             15, 'Sümegi', 'IP',  
+             16, 'Szentlőrinci', 'JP',  
+             17, 'Tatai', 'IO',  
+             18, 'Törökszentmiklósi', 'JO',  
+             19, 'Vásárosnaményi', 'IP',  
+             20, 'Záhonyi', 'IP'), nc=3, byrow=T)
+
+smpls = data.frame(id=as.numeric(m[,1]), jaras=m[,2], grp=m[,3])
+smpls$gdd = substr(smpls$grp,1,1)
+smpls$prec = substr(smpls$grp,2,2)
+
+i = 1
+library(readxl)
+dat = as.data.frame(read_excel('../data/minden_minta.xls', sheet=i))
+mintak = data.frame(meheszet=i, geo=c(dat[3,2], dat[3,3]), datum=c(dat[4,2], dat[4,3]))
+
+for(i in 2:20){
+  dat = as.data.frame(read_excel('../data/minden_minta.xls', sheet=i))
+  mintak = rbind(mintak, data.frame(meheszet=i, geo=c(dat[3,2], dat[3,3]), datum=c(dat[4,2], dat[4,3])))
+}
+
+mintak[which(mintak$meheszet==7),'geo'] = '46.4063333; 18.2502167'
+# mintak[which(mintak$meheszet==14),'geo'] = '47.9440500; 20.3596167' # indicated badly in the table
+mintak[which(mintak$meheszet==14),'geo'] = '46.20143; 17.45692'
+mintak[which(mintak$meheszet==16),'geo'] = '46.0808333; 17.9911111'
+
+mintak[16,'geo'] = mintak[15,'geo']
+
+mintak$geo = gsub(',', ';', mintak$geo)
+
+mintak$geo[mintak$geo=="N 46˚25.752'      E 20˚04.431'"] = '46.4292000; 20.0738500'
+mintak$geo[mintak$geo=="47 35.644     19 18.077"] = '47.5940667; 19.3012833'
+mintak$geo[mintak$geo=="N 47˚56'38''                                                E 20˚21'23''"] = '47.9438889; 20.3563889'
+mintak$geo[mintak$geo=="48 03.737   20 21.424"] = '48.0622833; 20.3570667'
+mintak$geo[mintak$geo=="N 47˚46'31''                                                E 19˚40'12''"] = '47.7752778; 19.6700000'
+mintak$geo[mintak$geo=="47 48 17          19 41 39"] = '47.8047222; 19.6941667'
+
+mintak$geo = gsub(' ', '', mintak$geo)
+m = matrix(unlist(lapply(lapply(strsplit(mintak$geo, ';'), as.numeric), sort)), nc=2, byrow=T)
+
+mintak$lon = m[,1]
+mintak$lat = m[,2]
+mintak$sid = rep(c(1,2), 20)
+
+# There were replacements of families between the two sampling dates
+mintak$csaladok = 'kezdő'
+mintak$csaladok[mintak$sid==2] = 'ua'
+
+mintak$csaladok[which(mintak$meheszet==2 & mintak$sid==2)] = 'switch, got in the pool'
+mintak$csaladok[which(mintak$meheszet==13 & mintak$sid==2)] = 'switch, did not get in the pool'
+mintak$csaladok[which(mintak$meheszet==6 & mintak$sid==2)] = 'was elsewhere, did not get in the pool'
+mintak$csaladok[which(mintak$meheszet==16 & mintak$sid==2)] = 'was elsewhere, got in the pool'
+
+# Load geographical data
+drv = dbDriver("SQLite") 
+con = dbConnect(drv, dbname='../data/db.sqlite', loadable.extensions=TRUE)
+lext = dbGetQuery(con, "SELECT load_extension('/usr/lib/x86_64-linux-gnu/mod_spatialite.so')")
+
+library(RpostGIS) # From https://github.com/solymosin/RpostGIS
+
+sql = "select id as gid, name, st_astext(geom) as geom from admin7"
+jaras.tab = dbGetQuery(con, sql)
+jaras.sp = wkt2sp(geoms=jaras.tab, gcol='geom', idcol='gid')
+proj4string(jaras.sp) = CRS('+init=epsg:4326')
+jaras.sf = st_as_sf(jaras.sp)
+st_crs(jaras.sf) = 4326
+
+sql = "select id as gid, name, st_astext(st_transform(geom,4326)) as geom from admin8b where name='Budapest'"
+bp = dbGetQuery(con, sql)
+bp = wkt2sp(geoms=bp, gcol='geom', idcol='gid')
+proj4string(bp) = CRS('+init=epsg:4326')
+bp = st_as_sf(bp)
+
+# create new columns
+jaras.sf = rbind(jaras.sf, bp)
+
+save.image(file='../_checkpoint/1_cleaned_data.RData')
+```

@@ -1,0 +1,46 @@
+```{r}
+# Load checkpoint
+load(file='../_checkpoint/2_checkpoint_estrich.RData')
+
+wd = inner_join(msd, obst)
+wd$GDD = ifelse(wd$GDD=='Lower', 'Cooler', 'Warmer')
+wd$Precipitation = ifelse(wd$Precipitation=='Lower', 'Less', 'More')
+
+pd2 = wd[,c('Sampling', 'val')]
+colnames(pd2)[1] = 'grp'
+pd2$str = ''
+pd2$season = pd2$grp
+pd2$cond = ''
+
+tmp = wd[which(wd$Sampling=='March'),c('Precipitation','val')]
+colnames(tmp)[1] = 'grp'
+tmp$str = 'March - Precipitation'
+tmp$season = 'March'
+tmp$cond = 'Precipitation'
+pd2 = rbind(pd2, tmp)
+
+tmp = wd[which(wd$Sampling=='May'),c('Precipitation','val')]
+colnames(tmp)[1] = 'grp'
+tmp$str = 'May - Precipitation'
+tmp$season = 'May'
+tmp$cond = 'Precipitation'
+pd2 = rbind(pd2, tmp)
+
+tmp = wd[which(wd$Sampling=='March'),c('GDD','val')]
+colnames(tmp)[1] = 'grp'
+tmp$str = 'March - GDD'
+tmp$season = 'March'
+tmp$cond = 'GDD'
+pd2 = rbind(pd2, tmp)
+
+tmp = wd[which(wd$Sampling=='May'),c('GDD','val')]
+colnames(tmp)[1] = 'grp'
+tmp$str = 'May - GDD'
+tmp$season = 'May'
+tmp$cond = 'GDD'
+pd2 = rbind(pd2, tmp)
+pd2$grp = factor(pd2$grp)
+
+# Save checkpoint
+# save.image(file='data/tmp_pd_Obs-GDD-Prec.RData')
+```

@@ -1,0 +1,108 @@
+
+<!-- # Check dependency on variables by fittin linear mixed models -->
+<!-- https://stats.oarc.ucla.edu/other/mult-pkg/introduction-to-linear-mixed-models/ -->
+
+<!-- ```{r} -->
+<!-- library(nlme) -->
+
+<!-- fit = lme(val~Sampling, random=~1|loc,data=wd) -->
+<!-- summary(fit) -->
+
+<!-- fit = lm(val~GDD, data=wd, subset=Sampling=='March') -->
+<!-- summary(fit) -->
+
+<!-- fit = lm(val~GDD, data=wd, subset=Sampling=='May') -->
+<!-- summary(fit) -->
+
+<!-- fit = lm(val~Precipitation, data=wd, subset=Sampling=='March') -->
+<!-- summary(fit) -->
+
+<!-- fit = lm(val~Precipitation, data=wd, subset=Sampling=='May') -->
+<!-- summary(fit) -->
+
+
+<!-- ``` -->
+
+<!-- # What happens here? -->
+<!-- That is only for create=ing the plot? -->
+
+```{r}
+library(ggplot2)
+dodge = position_dodge(width=1)
+```
+
+The within-subject diversity (α-diversity) was assessed using the **numbers of observed** species (richness) and the **Inverse Simpson’s Index** (evenness).
+```{r, fig.cap="Richness and evenness of honey bee gut bacteriome by sample groups.<br>The numbers of observed species (richness) and the Inverse Simpson’s Index (evenness) as α-diversity metrics are presented as a violin and box plot combination. These indices were calculated in 1,000 iterations of rarefied OTU tables with a sequencing depth of 6,129. The average over the iterations was taken for each apiary. The violin plot shows the probability density, while the box plot marks the outliers, median and the IQR. For Inverse Simpson’s Index, the comparison of samples from cooler and warmer districts collected in March showed significant (p = 0.0215) differences. <br>https://doi.org/10.1371/journal.pone.0273844.g002"}
+
+pd1$tipus="Inverse Simpson’s Index"
+pd2$tipus='Number of observed species'
+
+pda = rbind(pd1, pd2)
+
+#library(DT)
+pda %>%
+ggplot(aes(x=grp, y=val, fill=season)) + 
+geom_violin(trim=FALSE, position = dodge) + 
+scale_fill_manual(values = c('blue4', 'green4'), name="Sampling") + 
+geom_boxplot(width=0.1, position=dodge, color='yellow') + 
+facet_grid(tipus ~ cond, scales="free", switch = "y", as.table =F) +
+theme_bw() + xlab('') + ylab("Inverse Simpson's Index") +
+theme(
+  strip.background = element_blank(),
+  axis.title.y = element_blank(),
+  strip.placement = 'outside',
+  strip.text.y = element_text(angle=-90),
+  strip.text = element_text(size = rel(1.03)),
+  legend.position = c(0.165, 1.04),
+  legend.direction = "horizontal",
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  plot.margin = margin(1, 1, -3, 1, 'mm')
+)
+```
+## Between-subject diversity
+
+```{r}
+library(phyloseq)
+# normalize the sample count?
+opseq = transform_sample_counts(faj, function(x){x / sum(x)})
+```
+
+```{r}
+# This one?
+ord = ordinate(opseq, "NMDS", "bray");
+round(ord$stress,3)
+```
+
+```{r, fig.keep='all' , fig.cap = "NMDS ordination of bacteriome for sampling March and May. <br> Bray-Curtis dissimilarity was calculated using the species-level abundance of core bacteria. The samples from apiaries (IDs in dots) collected in March (blue) and May (green) are plotted using these dissimilarities. Based on the same measures, PERMANOVA analysis showed significant differences between the sampling time periods (p = 0.002, stress = 0.144). <br> https://doi.org/10.1371/journal.pone.0273844.g003"}
+plot_ordination(opseq, ord, type='samples', color='Sampling') +
+geom_point(size=8)+
+geom_text(mapping = aes(label = id), size=5, color='yellow') +
+theme_bw() + 
+scale_color_manual(values = c('blue4', 'green4')) +
+theme(legend.position="top",
+plot.margin = margin(1, 10, 1, 1, 'mm')
+)
+```
+
+```{r, figures-side, fig.show="hold", out.width="50%", fig.dim=c(8,8), fig.cap="NMDS ordination of bacteriome for environmental condition categories by sampling period.<br>The colours represent the environmental condition categories and the numbers correspond to the apiary IDs. The stress was 0.062 and 0.116 for March and May respectively. The samples’ bacteriome from March showed significant (p = 0.02) distance between the cooler and warmer districts. From the same period, the precipitation levels did not differ significantly (p = 0.155). In the samples gathered in May, there was no significant distance neither between GDD nor precipitation categories (p = 0.277 and p = 0.849, respectively). <br>https://doi.org/10.1371/journal.pone.0273844.g004"}
+plot_ordination(opseq, ord, type='samples', color='GDD') +
+geom_point(size=8)+
+geom_text(mapping = aes(label = id), size=5, color='black') +
+theme_bw() + 
+facet_wrap( ~ Sampling, nrow=2, ncol=1) + 
+scale_color_manual(values = c("grey", "red"), name="GDD", breaks=c('Lower', 'Upper'), labels=c('Cooler', 'Warmer'))+
+theme(legend.position="top",
+plot.margin = margin(1, 1, 1, 1, 'mm')
+) 
+plot_ordination(opseq, ord, type='samples', color='Precipitation') +
+geom_point(size=8)+
+geom_text(mapping = aes(label = id), size=5, color='white') +
+theme_bw() + 
+facet_wrap( ~ Sampling, nrow=2, ncol=1) + 
+scale_color_manual(values = c("brown", "blue"), name="Precipitation",breaks=c('Lower', 'Upper'), labels=c('Less', 'More'))+
+theme(legend.position="top",
+plot.margin = margin(1, 10, 1, 1, 'mm')
+) +
+scale_y_continuous(position = "right")
+```

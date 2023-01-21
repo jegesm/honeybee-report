@@ -1,0 +1,71 @@
+```{r}
+# load checkpoint
+load(file='../_checkpoint/4_checkpoint_corebact.RData')
+```
+
+```{r}
+library(microbiome)
+pset = pseq.core
+meta = meta(pset)
+wd = pset
+taxa_names(wd) = tax_table(wd)[,'Species']
+
+ds2 = phyloseq_to_deseq2(wd, ~ aid + Sampling)
+library(DESeq2)
+dds = DESeq(ds2)
+
+res = results(dds, contrast=c('Sampling','May','March'))
+df1 = as.data.frame(res)
+df1$Species = rownames(df1)
+
+wd = subset_samples(pseq.core, Sampling=='March')
+taxa_names(wd) = tax_table(wd)[,'Species']
+
+ds2 = phyloseq_to_deseq2(wd, ~ GDD)
+dds = DESeq(ds2)
+res = results(dds, contrast=c('GDD','Upper','Lower'))
+df2 = as.data.frame(res)
+df2$Species = rownames(df2)
+
+
+ds2 = phyloseq_to_deseq2(wd, ~ Precipitation)
+dds = DESeq(ds2)
+res = results(dds, contrast=c('Precipitation','Upper','Lower'))
+df3 = as.data.frame(res)
+df3$Species = rownames(df3)
+
+wd = subset_samples(pseq.core, Sampling=='May')
+taxa_names(wd) = tax_table(wd)[,'Species']
+
+ds2 = phyloseq_to_deseq2(wd, ~ GDD)
+dds = DESeq(ds2)
+res = results(dds, contrast=c('GDD','Upper','Lower'))
+df4 = as.data.frame(res)
+df4$Species = rownames(df4)
+
+
+ds2 = phyloseq_to_deseq2(wd, ~ Precipitation)
+dds = DESeq(ds2)
+res = results(dds, contrast=c('Precipitation','Upper','Lower'))
+df5 = as.data.frame(res)
+df5$Species = rownames(df5)
+
+# tab5 = df5 %>% 
+#   mutate(
+#     FC = paste(round(2^log2FoldChange,2), ' (', round(2^(log2FoldChange-(1.96*lfcSE)),2), ', ', round(2^(log2FoldChange+(1.96*lfcSE)),2), ')', sep='')
+#   ) %>% 
+#   select(Species, baseMean, FC, padj)
+
+wd = pset
+taxa_names(wd) = tax_table(wd)[,'Species']
+
+ds2 = phyloseq_to_deseq2(wd, ~ GDD)
+dds = DESeq(ds2)
+res = results(dds, contrast=c('GDD','Upper','Lower'))
+df6 = as.data.frame(res)
+df6$Species = rownames(df6)
+```
+
+```{r}
+save.image(file='../_checkpoint/5_checkpoint_pd_tables.RData')
+```
